@@ -9,7 +9,7 @@ I'm modelling the map distortions by defining regions as a polygon of points, an
 This project is intended to be used in a European history class to show how Europe's population changed throughout the ages.
 
 Here is an example image of a world cartogram:
-![Sample Cartogram](images/something)
+![Sample Cartogram](images/Population-cartogram_World.png)
 
 As you can see, a cartogram is just a map that has distortions to increase/decrease the area of certain places to show a variable.
 
@@ -25,7 +25,7 @@ Each region will push/pull on each of its points based on whether the real volum
 Fine-tuning a single map is what the method is normally used for, but it could easily be adapted to suit an animated map, which is what I want.
 
 ## Mockup
-![Western Europe Mockup](images/haventaddedyet)
+![Western Europe Mockup](images/basicMockup.png)
 
 ## Class Diagram
 ![Class Diagram](images/CartogramClassDiagram.png)
