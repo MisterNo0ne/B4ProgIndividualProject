@@ -84,6 +84,7 @@ function mouseReleased() {
   if (!fullscreen()) {
     if (mouseX>0 && mouseX<width && mouseY>0 && mouseY<height) {
       fullscreen(true);
+      resizeCanvas(windowWidth, windowHeight);
     }
   }
 }
