@@ -25,10 +25,10 @@ let damping;   //controls damping strength
 let backgroundColor;
 
 function preload() {
-  backgroundImage = loadImage("westernEurope.png");
-  positions = loadStrings("positions.txt");
-  regionIndices = loadStrings("regions.txt");
-  centers = loadStrings("centers.txt");
+  backgroundImage = loadImage("src/westernEurope.png");
+  positions = loadStrings("src/positions.txt");
+  regionIndices = loadStrings("src/regions.txt");
+  centers = loadStrings("src/centers.txt");
 }
 
 function setup() {
