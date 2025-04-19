@@ -1,79 +1,95 @@
-/* Things to add
-
-http://lambert.nico.free.fr/tp/biblio/Dougeniketal1985.pdf
-
---fix instability when points are very very close to the center
-map positions to be within the bounds of the screen
-
-countries find their population by lerping nearest pts
-
-(this is a 2.0 fix) rehaul sim to use softbody sponge mesh with spring forces between adjacent masspoints, and volume changes just change how much the sponge is pushing
-
-*/
-
-let backgroundImage;
 let positions;
 let regionIndices;
 let centers;
+let countryIndices;
+let populationTable;
+
+let stiffness; //controls spring strength
+let damping;   //controls damping strength
+let backgroundColor; 
 
 let massPoints;
 let regions;
 let switchers;
+let countries;
 
-let stiffness; //controls spring strength
-let damping;   //controls damping strength
-let backgroundColor;
+let volumePerPopulation;
+let bottomRightCorner;
+let mapScale;
+
+let simYear;
+let yearSlider;
 
 function preload() {
-  backgroundImage = loadImage("src/westernEurope.png");
-  positions = loadStrings("src/positions.txt");
-  regionIndices = loadStrings("src/regions.txt");
-  centers = loadStrings("src/centers.txt");
+  positions = loadStrings("positions.txt");
+  regionIndices = loadStrings("regions.txt");
+  centers = loadStrings("centers.txt");
+  countryIndices = loadStrings("countries.txt");
+  populationTable = loadTable("B4 Prog - Population Data.csv", "csv", "header");
 }
 
 function setup() {
   createCanvas(windowWidth, windowHeight);
+  bottomRightCorner = createVector(1600, 1570);
   
-  stiffness = 0.001;
-  damping = 10*sqrt(stiffness); 
+  stiffness = 0.005;
+  damping = 2*sqrt(0.1); 
+  backgroundColor = color(245);
+  
   massPoints = [];
   regions = [];
   switchers = [];
+  countries = [];  
   loadObjects();
   
-  backgroundColor = 245;
+  
+  //estimating that a normal total population for europe is 
+  volumePerPopulation = getPopulationDensity(300000);
+  
+  mapScale = min(width/bottomRightCorner.x, height/bottomRightCorner.y);
+  
+  simYear = 1400;
+  yearSlider = createSlider(1400, 2000, simYear, 50);
+  yearSlider.position(10, 10);
+  yearSlider.size(width-20);
 }
 
 function draw() {
+  simYear = yearSlider.value();
   background(backgroundColor);
-  image(backgroundImage, width/2, height/2);
-  
   if (keyIsDown(83) && regions[0].getVolume() > 400) {
     regions[0].wantVolume -= 200;
   }
   if (keyIsDown(87)) {
     regions[0].wantVolume += 200; 
   }
-  
-  for (let sw of switchers) {
-    sw.display();
-    sw.easing();
-  }
   push();
   fill(0);
   noStroke();
   
+  for (let c of countries) {
+    c.setRegionWantVolumes(simYear);
+  }
   for (let r of regions) {
+    r.easeWantVol(0.2);
     r.show(switchers[2].gs(), switchers[3].gs());
     r.pressureForce();
-    r.fixSelfIntersecting(0.01, 20);
+    // r.fixSelfIntersecting(0.01, 20);
   }
   for (let i=0; i<massPoints.length; i++) {
     let mp = massPoints[i];
     if (switchers[0].gs()) mp.show(switchers[1].gs(), i); 
-    //first parameter is debug mode
+    // first parameter is debug mode
     mp.forces(false);
     mp.kinematics();
+  }
+  
+  fill(100);
+  rect(bottomRightCorner.x*mapScale, 0, width, height);
+  
+  for (let sw of switchers) {
+    sw.display();
+    sw.easing();
   }
 }
 
@@ -84,71 +100,164 @@ function mouseReleased() {
   if (!fullscreen()) {
     if (mouseX>0 && mouseX<width && mouseY>0 && mouseY<height) {
       fullscreen(true);
+      
       resizeCanvas(windowWidth, windowHeight);
+      mapScale = min(width/bottomRightCorner.x, height/bottomRightCorner.y);
     }
   }
 }
 
 function keyReleased() {
-  // regions[1].wantVolume *= 0.9;
-  regions[2].wantVolume *= 1.1;
+  if (key == 'r') {
+    print(width, height);
+    resizeCanvas(windowWidth, windowHeight);
+    mapScale = min(width/bottomRightCorner.x, height/bottomRightCorner.y);
+  }
 }
 
 function loadObjects() {
+  loadMassPoints();
+  loadRegions();
+  loadSwitchers();
+  loadCountries();
+}
+
+function loadMassPoints() {
   for (let p of positions) {
-    let coords = p.match(/^(\d+\.?\d*)\s(\d+\.?\d*)\s*$/);
+    let coords = p.match(/^(-?\d+\.?\d+)\s+(-?\d+\.?\d+)\s*$/);
     let pos = createVector(float(coords[1]), float(coords[2]));
     massPoints.push(new Masspoint(pos, stiffness, damping));
   }
-  
+}
+
+function loadRegions() {
   for(let i=0; i<regionIndices.length; i++) {
     let indexStrings = regionIndices[i].match(/\d+/g);
     let indexInts = [];
-    for (let i=0; i<indexStrings.length; i++) {
-      indexInts.push(int(indexStrings[i]));
+    for (let j=0; j<indexStrings.length; j++) {
+      indexInts.push(int(indexStrings[j]));
     }
     
-    let cStr = centers[i].match(/^(\d+\.?\d*)\s(\d+\.?\d*)\s*$/);
+    let cStr = centers[i].match(/^(-?\d+\.?\d+)\s+(-?\d+\.?\d+)\s*$/);
     let centerPos = createVector(float(cStr[1]), float(cStr[2]));
     
     regions.push(new Region(color('grey'), indexInts, centerPos));
   }
-  
+}
+
+function loadSwitchers() {
   switchers.push(new Switcher(createVector(20, 20), false, "Show mass points"));
   switchers.push(new Switcher(createVector(20, 45), false, "Show mass point indices"));
   switchers.push(new Switcher(createVector(20, 70), false, "Show centroid"));
   switchers.push(new Switcher(createVector(20, 95), false, "Show volume difference"));
 }
 
+function loadCountries() {
+  let years = populationTable.getColumn("Years");
+  let columns = populationTable.columns;
+  
+  for (let c=1; c<columns.length; c++) {
+    //get years and population
+    let col = columns[c];
+    let countryYears = [];
+    let countryValues = [];
+    
+    for (let r=0; r<populationTable.getRowCount(); r++) {
+      let ryear = years[r];
+      let rvalStr = populationTable.getString(r, col);
+      
+      if (rvalStr !== "") {
+        countryYears.push(int(ryear));
+        countryValues.push(float(rvalStr));
+      }
+    }
+    
+    //get regions
+    let indexStrings = countryIndices[c-1].match(/\d+/g);
+    let indexInts = [];
+    for (let i=0; i<indexStrings.length; i++) {
+      indexInts.push(int(indexStrings[i]));
+    }
+    
+    countries.push(new Country(indexInts, countryYears, countryValues));
+  }
+}
+
+function getPopulationDensity(avgTotalPopulation) {
+  let totalVolume = 0;
+  for (let r of regions) {
+    totalVolume += r.getBaseVolume();
+  }
+  return totalVolume / avgTotalPopulation;
+}
+
 
 
 
 class Country {
-  constructor(regions) {
-    this.regions = regions;
-    this.relativeSizes = this.getRelSizes();
-    this.population = 22300;
+  constructor(regionIndices, years, populations) {
+    this.regionIndices = regionIndices;
+    this.relSizes = this.getRelSizes();
+    this.years = years;
+    this.populations = populations;
+    this.colour = color(random(0, 255), random(0, 255), random(0, 255));
+    this.setRegionColours();
   }
   
-  //in the future have something like this:
-  /*
-  let pop = map(time, lowerTime, upperTime, lowerPop, higherPop);
-  */
-  
-  setRegionWantVolumes() {
-    for (let r of this.regions) {
-      // r.wantVolume = r.
+  setRegionColours() {
+    for (let ind of this.regionIndices) {
+      regions[ind].colour = this.colour;
     }
+  }
+  
+  setRegionWantVolumes(getyear) {
+    let totVol = this.getTotVolume(getyear);
+    if (totVol != -1) {
+      for (let i=0; i<this.regionIndices.length; i++) {
+        let ind = this.regionIndices[i];
+        regions[ind].wantVolume = totVol * this.relSizes[i];
+      }
+    }
+  }
+  
+  getTotVolume(getyear) {
+    if (this.getPopulation(getyear) == -1) {
+      return -1;
+    }
+    return this.getPopulation(getyear) * volumePerPopulation;
+  }
+  
+  getPopulation(getyear) { 
+    //loop through years to see if we find one
+    let ind = 0;
+    for (let i=0; i<this.years.length; i++) {
+      //if we have a datapoint, just return the population
+      if (this.years[i] == getyear) return this.populations[i];
+      
+      //otherwise, check if the year is too high
+      if (this.years[i] > getyear) {
+        //oh no we passed it abort
+        ind = i;
+        break;
+      }
+    }
+    //if we have datapoints above and below, interpolate between them to get a population estimate
+    if (ind != 0) {
+      return map(year, this.years[ind-1], this.years[ind], this.populations[ind-1], this.populations[ind]);
+    }
+    
+    //this should get overridden
+    return -1;
   }
   
   getRelSizes() {
     let totalBaseVolume = 0;
-    for (let r of this.regions) {
-      totalBaseVolume += r.getBaseVolume();
+    for (let i of this.regionIndices) {
+      totalBaseVolume += regions[i].getBaseVolume();
     }
     let trelSizes = [];
-    for (let r of this.regions) {
-      trelSizes.push(r.getBaseVolume() / totalBaseVolume);
+    for (let i of this.regionIndices) {
+      trelSizes.push(regions[i].getBaseVolume() / totalBaseVolume);
     }
     return trelSizes;
   }
@@ -174,6 +283,8 @@ class Masspoint {
   }
   
   show(debugMode, indexx) {
+    push();
+    scale(mapScale);
     strokeWeight(1.5);
     
     stroke(100);
@@ -194,13 +305,14 @@ class Masspoint {
       textAlign(CENTER);
       text(indexx, this.pos.x, this.pos.y-20);
     }
+    pop();
   }
   
   forces(debugMode) {
     //spring energy
     let springDir = p5.Vector.sub(this.origin, this.pos);
     let springForce = springDir.mult(this.stiffness);
-    // springForce.setMag(min(0.05, springForce.mag()));
+    springForce.setMag(min(1, springForce.mag()));
     this.acc.add(springForce);
     
     // damping force
@@ -216,6 +328,7 @@ class Masspoint {
   }
   
   kinematics() {
+    this.acc.setMag(min(1, this.acc.mag()));
     this.pos.add(this.vel);
     this.vel.add(this.acc);
     this.acc = createVector(0, 0);
@@ -236,10 +349,14 @@ class Region {
     this.center = roughCenter;
     this.center = this.getCenter();
     this.wantVolume = this.getBaseVolume();
+    this.easeVolume = this.wantVolume;
   }
   
   //use functions
   show(debugMode, massMode) {
+    push();
+    scale(mapScale);
+    
     strokeWeight(2);
     stroke(0);
     // fill(this.colour);
@@ -256,14 +373,20 @@ class Region {
     }
     
     if (massMode) {
-      push();
       textSize(32);
       noStroke();
       fill(0);
       textAlign(CENTER);
       text(round(1000*(this.wantVolume-this.getVolume()) / this.wantVolume)/10 + "%", this.center.x, this.center.y);
-      pop();
     }
+    pop();
+  }
+  
+  easeWantVol(volEasing) {
+    let vol = this.getVolume();
+    if (this.wantVolume > vol) this.easeVolume = min(vol*(1+volEasing), this.wantVolume); 
+    if (this.wantVolume < vol) this.easeVolume = max(vol*(1-volEasing), this.wantVolume);
+    // this.easeVolume = this.wantVolume;
   }
   
   pressureForce() {
@@ -271,9 +394,8 @@ class Region {
     
     for (let i=0; i<this.ptInd.length; i++) {
       let pressureDir = this.ptPos[i].copy().sub(this.center);
-      let fieldStrength = 4/(pow(pressureDir.mag(), 4)); 
-      let pressureStrength = (this.wantVolume-volume) / this.wantVolume;
-      // pressureStrength = 50*pow(pressureStrength, 3) + pressureStrength;
+      let fieldStrength = pressureDir.mag() < 5 ? 2/(pow(pressureDir.mag(), 4)) : 0;
+      let pressureStrength = (this.easeVolume-volume) / this.easeVolume;
       pressureDir.setMag(pressureStrength + fieldStrength);
       
       massPoints[this.ptInd[i]].acc.add(pressureDir);
@@ -282,7 +404,6 @@ class Region {
   
   //get functions
   getVolume() {
-    //code adapted from https://www.mathopenref.com/coordpolygonarea2.html
     this.updatePositions();
     
     let volume = 0;
@@ -312,10 +433,15 @@ class Region {
   }
   
   getCenter() {
+    if (this.getBaseVolume() < 10000) return this.center; 
+    //this while loop can be dangerous for small regions
+    //because the center can fly out forever
+    //quit immediately if they're too small
+    
     let tcenter = this.center;
+    let maxBuffer = this.minDistFrom(tcenter);
     let increment = 25; //this is the length the center will look
     let minIncrement = 1; //will stop once incr < minIncrement
-    let maxBuffer = this.minDistFrom(tcenter);
     
     while (increment > minIncrement) {
       let searchVector = createVector(increment, 0);
@@ -353,19 +479,18 @@ class Region {
     }
   }
   
-  //these self-intersection detections come from chatgpt, but i can explain them
   //this checks whether the sequence a, b, c makes a ccw turn
   ccw(a, b, c) {
     return (c.y - a.y) * (b.x - a.x) > (b.y - a.y) * (c.x - a.x);
   }
   
-  //this checks intersection by telling whether p1 and p2 are on opposite sides of the line p3-p4, and vice versa
+  //this checks intersection by telling whether p1 and p2 are on opposite sides of the line p3-p4, and same for p3 and p4 vs line p1-p2
   segmentsIntersect(p1, p2, p3, p4) {
     return (this.ccw(p1, p3, p4) != this.ccw(p2, p3, p4)) &&
            (this.ccw(p1, p2, p3) != this.ccw(p1, p2, p4));
   }
 
-  //this just checks every non-adjacent pair of line segments for intersections, and nudges by difference in midpoints
+  //this just checks every non-adjacent pair of line segments for intersections, and nudges by difference in midpoints if there are intersections
   fixSelfIntersecting(pushStrength, maxIterations) {
     let n = this.ptPos.length;
     
@@ -388,11 +513,11 @@ class Region {
             diff.setMag(pushStrength);
 
             //nudge points
-            massPoints[this.ptInd[i]].acc.add(diff);
-            massPoints[this.ptInd[(i+1)%n]].acc.add(diff);
+            massPoints[this.ptInd[i]].pos.add(diff);
+            massPoints[this.ptInd[(i+1)%n]].pos.add(diff);
 
-            massPoints[this.ptInd[j%n]].acc.sub(diff);
-            massPoints[this.ptInd[(j+1)%n]].acc.sub(diff);
+            massPoints[this.ptInd[j%n]].pos.sub(diff);
+            massPoints[this.ptInd[(j+1)%n]].pos.sub(diff);
 
             changed = true;
           }
@@ -437,11 +562,13 @@ class Switcher {
     this.knobColor = 'lightgrey';
     this.sliderPos = this.state ? 2*this.sliderRadius : 0;
     this.words = words;
+    this.truePos = this.pos;
   }
   
   display() {
+    this.truePos = this.pos.copy().add(createVector(bottomRightCorner.x*mapScale, 0));
     push();
-    translate(this.pos);
+    translate(this.truePos);
     noStroke();
     fill(this.sliderColor);
     rect(0, 0, 4*this.sliderRadius, 2*this.sliderRadius, this.sliderRadius);
@@ -459,7 +586,7 @@ class Switcher {
   }
   
   click() {
-    if (mouseX > this.pos.x && mouseX < this.pos.x + (4*this.sliderRadius) && mouseY > this.pos.y && mouseY < this.pos.y + (2*this.sliderRadius)) {
+    if (mouseX > this.truePos.x && mouseX < this.truePos.x + (4*this.sliderRadius) && mouseY > this.truePos.y && mouseY < this.truePos.y + (2*this.sliderRadius)) {
       this.state = !this.state;  
     }
   }
