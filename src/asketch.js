@@ -123,10 +123,15 @@ function loadObjects() {
 }
 
 function loadMassPoints() {
-  for (let p of positions) {
+  for (let i=0; i<positions.length; i++) {
+    let p = positions[i];
+    if (p != "") {
     let coords = p.match(/^(-?\d+\.?\d+)\s+(-?\d+\.?\d+)\s*$/);
     let pos = createVector(float(coords[1]), float(coords[2]));
     massPoints.push(new Masspoint(pos, stiffness, damping));
+    } else {
+      print(i);
+    }
   }
 }
 
