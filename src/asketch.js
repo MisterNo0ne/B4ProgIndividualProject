@@ -123,20 +123,16 @@ function loadObjects() {
 }
 
 function loadMassPoints() {
-  for (let i=0; i<positions.length; i++) {
+  for (let i=0; i<positions.length-1; i++) {
     let p = positions[i];
-    if (p != "") {
     let coords = p.match(/^(-?\d+\.?\d+)\s+(-?\d+\.?\d+)\s*$/);
     let pos = createVector(float(coords[1]), float(coords[2]));
     massPoints.push(new Masspoint(pos, stiffness, damping));
-    } else {
-      print(i);
-    }
   }
 }
 
 function loadRegions() {
-  for(let i=0; i<regionIndices.length; i++) {
+  for(let i=0; i<regionIndices.length-1; i++) {
     let indexStrings = regionIndices[i].match(/\d+/g);
     let indexInts = [];
     for (let j=0; j<indexStrings.length; j++) {
