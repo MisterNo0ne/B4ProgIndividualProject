@@ -23,9 +23,9 @@ let yearSlider;
 function preload() {
   positions = loadStrings("src/positions.txt");
   regionIndices = loadStrings("src/regions.txt");
-  centers = loadStrings("centers.txt");
-  countryIndices = loadStrings("countries.txt");
-  populationTable = loadTable("B4 Prog - Population Data.csv", "csv", "header");
+  centers = loadStrings("src/centers.txt");
+  countryIndices = loadStrings("src/countries.txt");
+  populationTable = loadTable("src/B4 Prog - Population Data.csv", "csv", "header");
 }
 
 function setup() {
