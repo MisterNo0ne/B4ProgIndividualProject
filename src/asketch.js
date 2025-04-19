@@ -21,8 +21,8 @@ let simYear;
 let yearSlider;
 
 function preload() {
-  positions = loadStrings("positions.txt");
-  regionIndices = loadStrings("regions.txt");
+  positions = loadStrings("src/positions.txt");
+  regionIndices = loadStrings("src/regions.txt");
   centers = loadStrings("centers.txt");
   countryIndices = loadStrings("countries.txt");
   populationTable = loadTable("B4 Prog - Population Data.csv", "csv", "header");
