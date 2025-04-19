@@ -1,6 +1,8 @@
 # B4 Programming - Individual Final Project
 My individual final project is an animated cartogram that shifts based on changing values of the thematic variable. 
 
+You can see it [here](https://misterno0ne.github.io/B4ProgIndividualProject/).
+
 The thematic variable is intended to be population, but the simulation will support any number of other things (economy, immigration).
 
 I'm modelling the map distortions by defining regions as a polygon of points, and moving those points based on the Dougenik technique.
